@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1216">
+<title>WMS คลังผ้าม้วน SPUN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <h1 id="page-title">ค้นหา</h1>
+    <button id="user-btn" class="user-btn" hidden aria-label="บัญชีผู้ใช้"></button>
+  </header>
+  <div id="banner" class="banner" hidden></div>
+  <main id="main"></main>
+</div>
+
+<nav class="bottom-nav" aria-label="เมนูหลัก">
+  <a href="#/search" data-route="search"></a>
+  <a href="#/receive" data-route="receive"></a>
+  <a href="#/map" data-route="map"></a>
+  <a href="#/history" data-route="history"></a>
+</nav>
+<div id="login-root"></div>
+<div id="toasts" aria-live="polite"></div>
+
+<!-- Firebase SDK (compat) — ใช้เฉพาะเมื่อตั้งค่า js/config.js แล้ว ไม่งั้นรันโหมดทดลอง -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+
+<script src="js/config.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/db.js"></script>
+<script src="js/abc.js"></script>
+<script src="js/pages/search.js"></script>
+<script src="js/pages/receive.js"></script>
+<script src="js/pages/map.js"></script>
+<script src="js/pages/history.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

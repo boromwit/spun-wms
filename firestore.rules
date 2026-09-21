@@ -1,0 +1,29 @@
+rules_version = '2';
+// ต้องล็อกอิน (Firebase Authentication) จึงอ่าน/เขียนได้ + ห้ามลบ/แก้ประวัติ + กันข้อมูลผิดรูป/รูปใหญ่เกิน
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+
+    match /stock/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+                    && request.resource.data.keys().hasAll(['lot', 'color', 'qty', 'loc', 'status', 'receivedAt'])
+                    && request.resource.data.lot is string && request.resource.data.lot.size() < 40
+                    && request.resource.data.qty is number && request.resource.data.qty > 0
+                    && (!('photo' in request.resource.data) || request.resource.data.photo.size() < 400000);
+      allow update: if signedIn() && request.resource.data.status in ['stored', 'picked'];
+      allow delete: if false;
+    }
+
+    match /slots/{loc} {
+      allow read, create, update, delete: if signedIn();
+    }
+
+    match /tx/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.type in ['in', 'out'];
+      allow update, delete: if false;
+    }
+  }
+}
