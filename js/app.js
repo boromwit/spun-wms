@@ -8,6 +8,7 @@
   const userBtn = document.getElementById('user-btn');
   let cur = null;
 
+  W.theme.fillButtons();
   document.querySelectorAll('.bottom-nav a').forEach((a) => {
     const r = a.dataset.route;
     a.innerHTML = `${W.icon[r]}<span>${navLabel[r]}</span>`;
@@ -61,7 +62,7 @@
   };
 
   function renderLogin() {
-    loginRoot.innerHTML = `<div class="login"><form class="login-card" novalidate>
+    loginRoot.innerHTML = `<button class="icon-btn theme-fab" data-theme-toggle aria-label="สลับโหมดสว่าง/มืด"></button><div class="login"><form class="login-card" novalidate>
         <div class="login-logo">SPUN</div>
         <h1>เข้าสู่ระบบ</h1><p class="muted">WMS คลังผ้าม้วน</p>
         <label class="field">ชื่อผู้ใช้<input id="lg-u" class="in" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"></label>
@@ -70,6 +71,7 @@
         <button class="btn primary block big" type="submit">เข้าสู่ระบบ</button>
         <p class="muted login-note">${W.db.state.mode === 'demo' ? 'โหมดทดลอง: ใส่ชื่อและรหัสอะไรก็ได้' : 'ลืมรหัสผ่าน? ติดต่อผู้ดูแลระบบ'}</p>
       </form></div>`;
+    W.theme.fillButtons(loginRoot);
     const f = loginRoot.querySelector('form'), err = loginRoot.querySelector('#lg-err'), btn = f.querySelector('button');
     f.addEventListener('submit', async (e) => {
       e.preventDefault();

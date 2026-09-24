@@ -52,8 +52,37 @@ window.WMS = window.WMS || {};
     trash: svg('<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/>'),
     download: svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>'),
     arrowIn: svg('<path d="M12 5v14m-6-6 6 6 6-6"/>'),
+    sun: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
+    moon: svg('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>'),
     arrowOut: svg('<path d="M12 19V5m-6 6 6-6 6 6"/>')
   };
+
+  // ---------- ธีม สว่าง/มืด (ค่าเริ่มต้นตั้งใน <head> ตามระบบเครื่อง; เลือกเองแล้วจำไว้) ----------
+  W.theme = {
+    get: () => document.documentElement.getAttribute('data-theme') || 'dark',
+    set(t) {
+      document.documentElement.setAttribute('data-theme', t);
+      try { localStorage.setItem('wms_theme', t); } catch (e) { /* ไม่เป็นไร */ }
+      const m = document.querySelector('meta[name="theme-color"]');
+      if (m) m.content = t === 'light' ? '#f3f5f8' : '#0f1216';
+    },
+    toggle() { this.set(this.get() === 'light' ? 'dark' : 'light'); },
+    // ใส่ไอคอนดวงอาทิตย์+พระจันทร์ (CSS โชว์ตามธีม) ให้ปุ่มสลับธีมทุกปุ่ม
+    fillButtons(root = document) {
+      root.querySelectorAll('[data-theme-toggle]').forEach((b) => {
+        if (!b.firstChild) b.innerHTML = `<span class="ic-sun">${W.icon.sun}</span><span class="ic-moon">${W.icon.moon}</span>`;
+      });
+    }
+  };
+  // ระบบเครื่องเปลี่ยนโหมด และผู้ใช้ยังไม่เคยเลือกเอง → ตามระบบ
+  if (window.matchMedia) {
+    matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
+      let saved = null;
+      try { saved = localStorage.getItem('wms_theme'); } catch (err) { /* ignore */ }
+      if (!saved) document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+    });
+  }
+  document.addEventListener('click', (e) => { if (e.target.closest('[data-theme-toggle]')) W.theme.toggle(); });
 
   // ---------- Toast ----------
   W.toast = (msg, kind = 'info') => {

@@ -4,6 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0f1216">
+<script>
+  // ตั้งธีมก่อนเรนเดอร์ (กันจอกะพริบ): ใช้ค่าที่เลือกไว้ ถ้าไม่มีให้ตามระบบเครื่อง
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem('wms_theme'); } catch (e) {}
+    if (t !== 'light' && t !== 'dark') t = window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.content = t === 'light' ? '#f3f5f8' : '#0f1216';
+  })();
+</script>
 <title>WMS คลังผ้าม้วน SPUN</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,7 +25,10 @@
 <div id="app">
   <header class="topbar">
     <h1 id="page-title">ค้นหา</h1>
-    <button id="user-btn" class="user-btn" hidden aria-label="บัญชีผู้ใช้"></button>
+    <div class="top-actions">
+      <button id="user-btn" class="user-btn" hidden aria-label="บัญชีผู้ใช้"></button>
+      <button class="icon-btn theme-btn" data-theme-toggle aria-label="สลับโหมดสว่าง/มืด"></button>
+    </div>
   </header>
   <div id="banner" class="banner" hidden></div>
   <main id="main"></main>
