@@ -30,6 +30,9 @@ WMS.pages.receive = (function (W) {
     });
   }
 
+  // ข้อมูลที่ใช้หา "ชนิดของผ้า" สำหรับ ABC: ล็อก/ขนาด/ผ้าพับ-ม้วน ของทั้ง lot + สีของแถวนี้
+  const abcCtx = (r) => ({ lock: val('#lot-p'), size: val('#lot-s'), form: val('#lot-f'), color: r.color });
+
   // จัดช่องให้ทุกพาเรทของทุกสี: ช่องที่พนักงานเลือกเองจองไว้ก่อน ที่เหลือใช้ช่องแนะนำตาม ABC เรียงลำดับ ไม่ซ้ำกัน
   function assignLocs() {
     const used = new Set();
@@ -39,7 +42,7 @@ WMS.pages.receive = (function (W) {
       else { s.manual = false; s.loc = null; } // ช่องถูกใช้ไปแล้ว/ซ้ำ → กลับไปใช้ค่าแนะนำ
     }));
     rows.forEach((r) => {
-      r.cls = W.abc.classOf(r.color, state);
+      r.cls = W.abc.classOf(abcCtx(r));
       const ranked = W.abc.ranked(r.cls.cls, state, used);
       let k = 0;
       r.slots.forEach((s) => {
@@ -67,7 +70,7 @@ WMS.pages.receive = (function (W) {
 
   function renderLoc(row) {
     const box = row.node.querySelector('.loc-box');
-    const cl = row.cls || W.abc.classOf(row.color, state), need = row.slots.length;
+    const cl = row.cls || W.abc.classOf(abcCtx(row)), need = row.slots.length;
     const missing = row.slots.filter((s) => !s.loc).length;
     const items = row.slots.map((s, i) => {
       const l = s.loc && W.locMap[s.loc];
@@ -82,7 +85,7 @@ WMS.pages.receive = (function (W) {
     }).join('');
     box.innerHTML = `<div class="loc-title">ตำแหน่งจัดเก็บ <small class="muted">(ใช้ ${need} ช่อง)</small>
         <span class="abc-pill c${cl.cls}">Class ${cl.cls}</span></div>
-      <p class="loc-why">${W.h(W.abc.reasonText(cl.reason))}</p>
+      <p class="loc-why">${W.h(cl.text)}</p>
       ${missing ? `<p class="warn">ช่องว่างไม่พอ — ขาดอีก ${missing} ช่อง</p>` : ''}
       <div class="pals">${items}</div>`;
   }
@@ -178,7 +181,7 @@ WMS.pages.receive = (function (W) {
 
   function build() {
     rows = [];
-    const L = WMS_CONFIG.lot, m0 = new Date().getMonth();
+    const L = WMS_CONFIG.lot, F = WMS_CONFIG.fabric, m0 = new Date().getMonth();
     el.innerHTML = `<section class="card">
         <div class="field-title">รหัส lot <em>*</em></div>
         <div class="lot-parts">
@@ -192,6 +195,10 @@ WMS.pages.receive = (function (W) {
             <input id="lot-r" class="in" inputmode="text" autocapitalize="characters" autocorrect="off" spellcheck="false" autocomplete="off" placeholder="${'0'.repeat(L.runDigits - 1)}1 หรือ A1"></label>
           <label class="field" id="lot-n-wrap" hidden>เลขที่ <small>(พิมพ์เอง ตัวเลข/ตัวอักษร ไม่จำกัด)</small>
             <input id="lot-n" class="in" inputmode="text" autocapitalize="characters" autocorrect="off" spellcheck="false" autocomplete="off" placeholder="เช่น 4821 หรือ A12"></label>
+          <label class="field" id="lot-s-wrap">ขนาดผ้า <small>(ไม่อยู่ในรหัส)</small>
+            <select id="lot-s" class="in"><option value="">เลือก</option>${F.sizes.map((x) => `<option value="${x.v}">${W.h(x.label)}</option>`).join('')}</select></label>
+          <label class="field" id="lot-f-wrap" hidden>ผ้าพับ/ผ้าม้วน <small>(ไม่อยู่ในรหัส)</small>
+            <select id="lot-f" class="in"><option value="">เลือก</option>${F.forms.map((x) => `<option value="${x.v}">${W.h(x.label)}</option>`).join('')}</select></label>
         </div>
         <div class="lot-preview" id="lot-preview" aria-live="polite"></div>
         <label class="field" style="margin-top:12px">D/O <small>(ถ้ามี)</small><input id="do" class="in" autocapitalize="characters" autocomplete="off" placeholder="เช่น DO-5503"></label>
@@ -208,6 +215,7 @@ WMS.pages.receive = (function (W) {
     num.addEventListener('input', () => { num.value = num.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); updateLotPreview(); });
     el.querySelector('#lot-p').addEventListener('change', syncLot);
     el.querySelector('#lot-m').addEventListener('change', updateLotPreview);
+    ['#lot-s', '#lot-f'].forEach((s) => el.querySelector(s).addEventListener('change', refreshLocs)); // ขนาด/ผ้าพับ-ม้วน เปลี่ยน → class เปลี่ยน → จัดช่องใหม่
     syncLot();
     el.querySelector('#add').addEventListener('click', addRow);
     el.querySelector('#save').addEventListener('click', save);
@@ -233,8 +241,11 @@ WMS.pages.receive = (function (W) {
     const P = lotPrefix(), manual = !!(P && P.manual);
     ['#lot-m-wrap', '#lot-t-wrap', '#lot-r-wrap'].forEach((s) => { el.querySelector(s).hidden = manual; });
     el.querySelector('#lot-n-wrap').hidden = !manual;
+    el.querySelector('#lot-f-wrap').hidden = !manual;     // ผ้าพับ/ผ้าม้วน เลือกเฉพาะล็อก 3G
+    if (!manual) el.querySelector('#lot-f').value = '';
     el.querySelector('#lot-t').value = P && P.type ? P.type : '';
     updateLotPreview();
+    refreshLocs();   // ล็อกเปลี่ยน → ชนิดผ้า/class เปลี่ยน → จัดช่องใหม่
   }
   function updateLotPreview() {
     const code = buildLot(), box = el.querySelector('#lot-preview');
@@ -262,6 +273,9 @@ WMS.pages.receive = (function (W) {
       return;
     }
     if (lot.length > MAX_LOT) { W.toast(`รหัส lot ยาวเกินไป (${lot.length} ตัวอักษร สูงสุด ${MAX_LOT})`, 'error'); return; }
+    const size = val('#lot-s'), LP = lotPrefix(), form = LP && LP.manual ? val('#lot-f') : '';
+    if (!size) { W.toast('กรุณาเลือกขนาดผ้า', 'error'); el.querySelector('#lot-s').focus(); return; }
+    if (LP && LP.manual && !form) { W.toast('กรุณาเลือกผ้าพับหรือผ้าม้วน', 'error'); el.querySelector('#lot-f').focus(); return; }
     assignLocs();
     const entries = [], seen = new Set();
     for (let i = 0; i < rows.length; i++) {
@@ -273,7 +287,7 @@ WMS.pages.receive = (function (W) {
       const entryId = 'e' + Date.now().toString(36) + i + Math.random().toString(36).slice(2, 6);
       r.slots.forEach((s, k) => {
         seen.add(s.loc);
-        entries.push({ color: r.color.trim(), qty, loc: s.loc, photo: k === 0 ? r.photo : null, entryId, pallet: k + 1, pallets: n });
+        entries.push({ color: r.color.trim(), qty, loc: s.loc, photo: k === 0 ? r.photo : null, entryId, pallet: k + 1, pallets: n, size, ...(form ? { form } : {}) });
       });
     }
     const btn = el.querySelector('#save');

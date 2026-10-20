@@ -41,6 +41,10 @@ window.WMS = window.WMS || {};
 
   // พาเรท: 1 พาเรท = 1 ช่อง (เอกสารเก่าที่ไม่มีฟิลด์ pallets = 1 พาเรท)
   W.palletLabel = (o) => (o && o.pallets > 1 ? `พาเรท ${o.pallet}/${o.pallets}` : '');
+  // ป้ายชื่อขนาด/ชนิดผ้า (รหัสที่เก็บในข้อมูล → ข้อความไทย; ไม่มีค่า = ข้อความว่าง)
+  const fabLabel = (list, v) => { const x = (list || []).find((o) => o.v === v); return x ? x.label : ''; };
+  W.sizeLabel = (v) => fabLabel(WMS_CONFIG.fabric.sizes, v);
+  W.formLabel = (v) => fabLabel(WMS_CONFIG.fabric.forms, v);
   // รูปถ่ายเก็บไว้ที่พาเรทแรกของแต่ละสี — พาเรทอื่นของสีเดียวกันดึงรูปจากพาเรทแรก
   W.photoOf = (s) => {
     if (!s) return '';

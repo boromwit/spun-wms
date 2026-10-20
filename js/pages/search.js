@@ -30,11 +30,13 @@ WMS.pages.search = (function (W) {
     const dos = [...new Set(items.map((s) => s.doNo).filter(Boolean))];
     const stored = items.filter((s) => s.status === 'stored');
     const pickedN = items.length - stored.length;
+    const m = items.find((s) => s.size || s.form) || {};
+    const tags = [m.size && W.sizeLabel(m.size), m.form && W.formLabel(m.form)].filter(Boolean).map((t) => `<span class="chip">${W.h(t)}</span>`).join('');
     items = items.slice().sort((a, b) => (a.status === 'picked') - (b.status === 'picked') || a.loc.localeCompare(b.loc));
     return `<article class="card lot-card">
       <div class="lot-head">
         <div><div class="lot-code">${W.h(lot)}</div>
-          <div class="lot-do">${dos.length ? dos.map((d) => `<span class="chip">D/O ${W.h(d)}</span>`).join('') : '<span class="muted">ไม่มี D/O</span>'}</div></div>
+          <div class="lot-do">${dos.length ? dos.map((d) => `<span class="chip">D/O ${W.h(d)}</span>`).join('') : '<span class="muted">ไม่มี D/O</span>'}${tags}</div></div>
         <div class="lot-sum"><b>${stored.length}</b><span>พาเรท คงเหลือ</span></div>
       </div>
       <div class="lot-progress">หยิบแล้ว ${pickedN}/${items.length} พาเรท</div>
@@ -63,7 +65,7 @@ WMS.pages.search = (function (W) {
     const photo = ph ? `<img class="photo" src="${W.h(ph)}" alt="รูปม้วนผ้า">` : '';
     const info = W.kv([
       ['Lot', W.h(s.lot)], s.doNo ? ['D/O', W.h(s.doNo)] : null,
-      ['สี', W.h(s.color)], s.pallets > 1 ? ['พาเรท', `${s.pallet} จาก ${s.pallets}`] : null,
+      ['สี', W.h(s.color)], s.size ? ['ขนาดผ้า', W.h(W.sizeLabel(s.size))] : null, s.form ? ['ผ้าพับ/ผ้าม้วน', W.h(W.formLabel(s.form))] : null, s.pallets > 1 ? ['พาเรท', `${s.pallet} จาก ${s.pallets}`] : null,
       ['จำนวน', `${W.fmtQty(s.qty)} ${W.unit}${s.pallets > 1 ? ' (รวมทุกพาเรทของสีนี้)' : ''}`],
       ['ตำแหน่ง', `<b>${W.h(s.loc)}</b><br><small class="muted">${W.h(W.locLabel(s.loc))}</small>`]
     ]) + photo;

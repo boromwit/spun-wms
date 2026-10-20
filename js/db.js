@@ -4,6 +4,7 @@
 //   stock/{id}  { lot, doNo, color, qty, loc, status:'stored'|'picked', photo?, receivedAt, pickedAt?, entryId?, pallet?, pallets? }
 //   slots/{loc} { stockId, lot, color, qty, entryId?, pallet?, pallets? }   ← 1 ช่อง = 1 doc; มีอยู่ = ช่องเต็ม (ใช้กันบันทึกทับช่องเดียวกัน)
 //   tx/{id}     { type:'in'|'out', stockId, lot, doNo, color, qty, loc, ts, note?, undo?, entryId?, pallet?, pallets? }
+//   เพิ่มเติม (ถ้ามี): size = 'small'|'large' · form = 'fold'|'roll' (เฉพาะล็อก 3G) — ไม่อยู่ในรหัส lot
 //   1 พาเรท = 1 ช่อง = 1 stock doc  (pallet = ลำดับพาเรท, pallets = จำนวนพาเรททั้งหมดของสีนั้น; qty = จำนวนม้วนทั้งรายการ ไว้ดูอย่างเดียว)
 window.WMS = window.WMS || {};
 (function (W) {
@@ -21,8 +22,16 @@ window.WMS = window.WMS || {};
   const toEmail = (id) => { id = String(id || '').trim(); return id.includes('@') || !domain ? id : id + '@' + domain; };
   const toName = (email) => (domain && String(email).endsWith('@' + domain)) ? String(email).slice(0, -(domain.length + 1)) : String(email);
   const who = () => (authState.user && authState.user.email) || '';
-  // ข้อมูลพาเรทที่ติดไปกับ stock/slots/tx (เอกสารเก่าที่ไม่มีฟิลด์นี้ = 1 พาเรท) — Firestore ไม่รับค่า undefined จึงใส่เมื่อมีเท่านั้น
-  const pinfo = (o) => (o && o.pallets ? { entryId: o.entryId, pallet: o.pallet, pallets: o.pallets } : {});
+  // ข้อมูลเสริมที่ติดไปกับ stock/slots/tx: พาเรท (entryId/pallet/pallets) + ขนาดผ้า (size) + ผ้าพับ/ผ้าม้วนของ 3G (form)
+  // เอกสารเก่าที่ไม่มีฟิลด์เหล่านี้ใช้ได้ปกติ (พาเรทเก่า = 1 พาเรท) — Firestore ไม่รับค่า undefined จึงใส่เมื่อมีเท่านั้น
+  const xinfo = (o) => {
+    const r = {};
+    if (!o) return r;
+    if (o.pallets) { r.entryId = o.entryId; r.pallet = o.pallet; r.pallets = o.pallets; }
+    if (o.size) r.size = o.size;
+    if (o.form) r.form = o.form;
+    return r;
+  };
 
   // ================= Firebase =================
   function firebaseBackend() {
@@ -76,9 +85,9 @@ window.WMS = window.WMS || {};
           snaps.forEach((s, i) => { if (s.exists) throw new Error('SLOT_TAKEN:' + entries[i].loc); });
           entries.forEach((e, i) => {
             const sRef = col('stock').doc();
-            const base = { lot, doNo, color: e.color, qty: e.qty, loc: e.loc, ...pinfo(e) };
+            const base = { lot, doNo, color: e.color, qty: e.qty, loc: e.loc, ...xinfo(e) };
             t.set(sRef, { ...base, status: 'stored', receivedAt: now, receivedBy: by, ...(e.photo ? { photo: e.photo } : {}) });
-            t.set(refs[i], { stockId: sRef.id, lot, color: e.color, qty: e.qty, ...pinfo(e) });
+            t.set(refs[i], { stockId: sRef.id, lot, color: e.color, qty: e.qty, ...xinfo(e) });
             t.set(col('tx').doc(), { ...base, type: 'in', stockId: sRef.id, ts: now, by });
           });
         });
@@ -94,7 +103,7 @@ window.WMS = window.WMS || {};
           const now = Date.now();
           t.update(sRef, { status: 'picked', pickedAt: now, pickedBy: by });
           t.delete(col('slots').doc(d.loc));
-          t.set(col('tx').doc(), { type: 'out', stockId: id, lot: d.lot, doNo: d.doNo || '', color: d.color, qty: d.qty, loc: d.loc, ts: now, by, ...pinfo(d) });
+          t.set(col('tx').doc(), { type: 'out', stockId: id, lot: d.lot, doNo: d.doNo || '', color: d.color, qty: d.qty, loc: d.loc, ts: now, by, ...xinfo(d) });
         });
       },
       async undoPick(id) {
@@ -109,8 +118,8 @@ window.WMS = window.WMS || {};
           if (sl.exists) throw new Error('SLOT_TAKEN:' + d.loc);
           const now = Date.now();
           t.update(sRef, { status: 'stored', pickedAt: firebase.firestore.FieldValue.delete(), pickedBy: firebase.firestore.FieldValue.delete() });
-          t.set(slotRef, { stockId: id, lot: d.lot, color: d.color, qty: d.qty, ...pinfo(d) });
-          t.set(col('tx').doc(), { type: 'in', undo: true, note: 'ยกเลิกการหยิบ', stockId: id, lot: d.lot, doNo: d.doNo || '', color: d.color, qty: d.qty, loc: d.loc, ts: now, by, ...pinfo(d) });
+          t.set(slotRef, { stockId: id, lot: d.lot, color: d.color, qty: d.qty, ...xinfo(d) });
+          t.set(col('tx').doc(), { type: 'in', undo: true, note: 'ยกเลิกการหยิบ', stockId: id, lot: d.lot, doNo: d.doNo || '', color: d.color, qty: d.qty, loc: d.loc, ts: now, by, ...xinfo(d) });
         });
       }
     };
@@ -191,9 +200,9 @@ window.WMS = window.WMS || {};
         const now = Date.now();
         entries.forEach((e) => {
           const id = uid();
-          const base = { lot, doNo, color: e.color, qty: e.qty, loc: e.loc, ...pinfo(e) };
+          const base = { lot, doNo, color: e.color, qty: e.qty, loc: e.loc, ...xinfo(e) };
           db.stock.push({ id, ...base, status: 'stored', receivedAt: now, ...(e.photo ? { photo: e.photo } : {}) });
-          db.slots[e.loc] = { stockId: id, lot, color: e.color, qty: e.qty, ...pinfo(e) };
+          db.slots[e.loc] = { stockId: id, lot, color: e.color, qty: e.qty, ...xinfo(e) };
           db.tx.push({ id: uid(), ...base, type: 'in', stockId: id, ts: now, by: who() });
         });
         save(); publish();
@@ -206,7 +215,7 @@ window.WMS = window.WMS || {};
         const now = Date.now();
         s.status = 'picked'; s.pickedAt = now;
         delete db.slots[s.loc];
-        db.tx.push({ id: uid(), type: 'out', stockId: id, lot: s.lot, doNo: s.doNo || '', color: s.color, qty: s.qty, loc: s.loc, ts: now, by: who(), ...pinfo(s) });
+        db.tx.push({ id: uid(), type: 'out', stockId: id, lot: s.lot, doNo: s.doNo || '', color: s.color, qty: s.qty, loc: s.loc, ts: now, by: who(), ...xinfo(s) });
         save(); publish();
       },
       async undoPick(id) {
@@ -215,8 +224,8 @@ window.WMS = window.WMS || {};
         if (!s) throw new Error('NOT_FOUND');
         if (db.slots[s.loc]) throw new Error('SLOT_TAKEN:' + s.loc);
         s.status = 'stored'; delete s.pickedAt;
-        db.slots[s.loc] = { stockId: id, lot: s.lot, color: s.color, qty: s.qty, ...pinfo(s) };
-        db.tx.push({ id: uid(), type: 'in', undo: true, note: 'ยกเลิกการหยิบ', stockId: id, lot: s.lot, doNo: s.doNo || '', color: s.color, qty: s.qty, loc: s.loc, ts: Date.now(), by: who(), ...pinfo(s) });
+        db.slots[s.loc] = { stockId: id, lot: s.lot, color: s.color, qty: s.qty, ...xinfo(s) };
+        db.tx.push({ id: uid(), type: 'in', undo: true, note: 'ยกเลิกการหยิบ', stockId: id, lot: s.lot, doNo: s.doNo || '', color: s.color, qty: s.qty, loc: s.loc, ts: Date.now(), by: who(), ...xinfo(s) });
         save(); publish();
       }
     };

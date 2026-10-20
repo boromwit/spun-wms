@@ -29,8 +29,8 @@ WMS.pages.history = (function (W) {
   function exportCsv() {
     const list = filtered(W.db.state);
     const q = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
-    const head = ['เวลา', 'ประเภท', 'Lot', 'D/O', 'สี', 'จำนวน', 'ตำแหน่ง', 'หมายเหตุ', 'ผู้ทำรายการ', 'พาเรท'];
-    const lines = list.map((t) => [W.fmtIso(t.ts), t.type === 'in' ? 'รับเข้า' : 'จ่ายออก', t.lot, t.doNo || '', t.color, t.qty, t.loc, t.note || '', t.by || '', t.pallets > 1 ? t.pallet + '/' + t.pallets : '1/1'].map(q).join(','));
+    const head = ['เวลา', 'ประเภท', 'Lot', 'D/O', 'สี', 'จำนวน', 'ตำแหน่ง', 'หมายเหตุ', 'ผู้ทำรายการ', 'พาเรท', 'ขนาดผ้า', 'ผ้าพับ/ผ้าม้วน'];
+    const lines = list.map((t) => [W.fmtIso(t.ts), t.type === 'in' ? 'รับเข้า' : 'จ่ายออก', t.lot, t.doNo || '', t.color, t.qty, t.loc, t.note || '', t.by || '', t.pallets > 1 ? t.pallet + '/' + t.pallets : '1/1', W.sizeLabel(t.size), W.formLabel(t.form)].map(q).join(','));
     // BOM ให้ Excel อ่านภาษาไทยถูก
     const blob = new Blob(['﻿' + [head.map(q).join(','), ...lines].join('\r\n')], { type: 'text/csv;charset=utf-8' });
     const d = new Date(), name = `wms-history-${filter}-${d.getFullYear()}${W.pad2(d.getMonth() + 1)}${W.pad2(d.getDate())}.csv`;

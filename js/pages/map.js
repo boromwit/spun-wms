@@ -55,7 +55,7 @@ WMS.pages.map = (function (W) {
       title: code, sub: W.locLabel(code),
       body: W.kv([
         ['Lot', W.h(s.lot)], st.doNo ? ['D/O', W.h(st.doNo)] : null,
-        ['สี', W.h(s.color)], s.pallets > 1 ? ['พาเรท', `${s.pallet} จาก ${s.pallets}`] : null,
+        ['สี', W.h(s.color)], st.size ? ['ขนาดผ้า', W.h(W.sizeLabel(st.size))] : null, st.form ? ['ผ้าพับ/ผ้าม้วน', W.h(W.formLabel(st.form))] : null, s.pallets > 1 ? ['พาเรท', `${s.pallet} จาก ${s.pallets}`] : null,
         ['จำนวน', `${W.fmtQty(s.qty)} ${W.unit}${s.pallets > 1 ? ' (รวมทุกพาเรทของสีนี้)' : ''}`],
         st.receivedAt ? ['รับเข้าเมื่อ', W.fmtTime(st.receivedAt)] : null
       ]) + (W.photoOf(st) ? `<img class="photo" src="${W.h(W.photoOf(st))}" alt="รูปม้วนผ้า">` : ''),

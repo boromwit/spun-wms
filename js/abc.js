@@ -1,46 +1,47 @@
-// ABC Analysis: จัด class ให้ "สี" จากยอดจ่ายออกย้อนหลัง แล้วแนะนำช่องว่างตาม class
-//   ยอดจ่ายออก = จำนวนพาเรทที่จ่าย (1 รายการจ่ายออก = 1 พาเรท) ไม่ใช้จำนวนม้วน
-//   A = ขายเร็ว → ช่องใกล้ประตู (Zone A) | B = กลาง | C = ช้า/สีใหม่ที่มีประวัติแล้วแต่ยังไม่เคยจ่าย
+// ABC Analysis ตามตารางในงานวิจัย: จัด class ให้ "ชนิดของผ้า" 7 ชนิดจากความยาว (หลา) สะสม แล้วแนะนำช่องว่างตาม class
+//   A = ขายเร็ว → ช่องใกล้ประตู | B = กลาง | C = ช้า — class ของแต่ละชนิดคำนวณจาก WMS_CONFIG.abc.types (ไม่ได้อ่านประวัติจ่ายออก)
+//   ชนิดผ้าของแต่ละรายการหาจากข้อมูลที่กรอกตอนรับเข้า:
+//     ล็อก B → ผ้าคุณภาพไม่ตรงตามต้องการ · ล็อก L → ผ้าผลิตเกิน
+//     ล็อก 3G → ผ้าพับ (เลือกผ้าพับ) หรือ ผ้าม้วนคุณภาพสูง = ขาว/สี (จากชื่อสี) × ขนาดเล็ก/ใหญ่
 window.WMS = window.WMS || {};
 (function (W) {
   const cfg = WMS_CONFIG.abc;
-  const key = (c) => String(c || '').trim().toLowerCase();
   const PREF = { A: ['A', 'B', 'C'], B: ['B', 'A', 'C'], C: ['C', 'B', 'A'] };
-  let memoTx = null, memo = null;
 
-  function analyse(state) {
-    if (memoTx === state.tx) return memo;
-    // จ่ายออกที่ถูก "ยกเลิกการหยิบ" ภายหลังต้องไม่นับ
-    const pending = new Map();
-    state.tx.slice().sort((a, b) => a.ts - b.ts).forEach((t) => {
-      if (t.type === 'out') pending.set(t.stockId, t);
-      else if (t.undo) pending.delete(t.stockId);
-    });
-    const since = Date.now() - cfg.windowDays * 864e5;
-    const outs = [...pending.values()].filter((t) => t.ts >= since);
-    const qtyBy = {};
-    let total = 0;
-    outs.forEach((t) => { qtyBy[key(t.color)] = (qtyBy[key(t.color)] || 0) + 1; total += 1; });
-    const cls = {};
-    let cum = 0;
-    Object.entries(qtyBy).sort((a, b) => b[1] - a[1]).forEach(([k, q]) => {
-      const share = total ? cum / total : 1;   // สัดส่วนสะสม "ก่อน" รวมสีนี้ → สีอันดับ 1 เป็น A เสมอ
-      cls[k] = share < cfg.aCut ? 'A' : share < cfg.bCut ? 'B' : 'C';
-      cum += q;
-    });
-    memoTx = state.tx;
-    memo = { cls, reliable: outs.length >= cfg.minTx };
-    return memo;
-  }
+  // ตาราง: เรียงตามความยาวมาก→น้อย + เปอร์เซ็นต์สะสม + class
+  const total = cfg.types.reduce((a, t) => a + t.yards, 0);
+  let cum = 0;
+  const table = cfg.types.slice().sort((a, b) => b.yards - a.yards).map((t, i) => {
+    cum += t.yards;
+    const share = cum / total;
+    const cls = i === 0 || share <= cfg.aCut + 1e-9 ? 'A' : share <= cfg.bCut + 1e-9 ? 'B' : 'C';
+    return { ...t, share, cls };
+  });
+  const byId = Object.fromEntries(table.map((t) => [t.id, t]));
+  const isWhite = (c) => {
+    const s = String(c || '').trim().toLowerCase();
+    return !!s && cfg.whiteWords.some((w) => s.includes(w.toLowerCase()));
+  };
 
   W.abc = {
-    // → {cls:'A'|'B'|'C', reason:'history'|'new'|'nodata'|'empty'}
-    classOf(color, state) {
-      const a = analyse(state);
-      if (!key(color)) return { cls: 'B', reason: 'empty' };
-      if (!a.reliable) return { cls: 'B', reason: 'nodata' };
-      const c = a.cls[key(color)];
-      return c ? { cls: c, reason: 'history' } : { cls: 'C', reason: 'new' };
+    table,
+    // ctx = { lock: '3G'|'B'|'L', size: 'small'|'large', form: 'fold'|'roll', color } → id ชนิดผ้า หรือ null ถ้าข้อมูลยังไม่ครบ
+    typeOf({ lock, size, form, color }) {
+      if (lock === 'B') return 'low-quality';
+      if (lock === 'L') return 'excess';
+      if (lock !== '3G') return null;
+      if (form === 'fold') return 'fold';
+      if (form === 'roll' && size && String(color || '').trim()) return (isWhite(color) ? 'white-' : 'color-') + size;
+      return null;
+    },
+    // → { cls:'A'|'B'|'C', text, type }  (ข้อมูลไม่ครบ → class B ชั่วคราว)
+    classOf(ctx) {
+      const id = this.typeOf(ctx || {});
+      const t = id && byId[id];
+      if (t) return { cls: t.cls, type: t, text: `ชนิดผ้า: ${t.name}` };
+      const lock = ctx && ctx.lock;
+      const hint = !lock ? 'เลือกล็อกก่อน' : lock === '3G' && !ctx.form ? 'เลือกผ้าพับ/ผ้าม้วน' : lock === '3G' && !ctx.size ? 'เลือกขนาดผ้า' : 'ระบุสี';
+      return { cls: 'B', type: null, text: `${hint}เพื่อให้แนะนำแม่นขึ้น (ตอนนี้ใช้ class B)` };
     },
     // ช่องว่างเรียงตามความเหมาะสมกับ class (ทุกช่อง) — exclude = Set ของ code ที่ไม่เอา
     ranked(cls, state, exclude) {
@@ -49,14 +50,6 @@ window.WMS = window.WMS || {};
         .filter((l) => !state.slots[l.code] && !(exclude && exclude.has(l.code)))
         .sort((a, b) => order.indexOf(a.abc) - order.indexOf(b.abc) || a.order - b.order);
     },
-    suggest(cls, state, exclude, n = 3) { return this.ranked(cls, state, exclude).slice(0, n); },
-    reasonText(r) {
-      return {
-        history: 'ขายเร็วเทียบกับสีอื่น ๆ',
-        new: 'ยังไม่เคยจ่ายออกในช่วงที่ผ่านมา',
-        nodata: 'ข้อมูลจ่ายออกยังไม่พอ ใช้ค่ากลาง',
-        empty: 'ระบุสีเพื่อให้แนะนำแม่นขึ้น'
-      }[r];
-    }
+    suggest(cls, state, exclude, n = 3) { return this.ranked(cls, state, exclude).slice(0, n); }
   };
 })(window.WMS);
