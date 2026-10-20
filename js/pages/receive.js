@@ -4,6 +4,7 @@ WMS.pages = WMS.pages || {};
 WMS.pages.receive = (function (W) {
   let el, rows = [], nextId = 1, state = W.db.state;
   const MAXP = WMS_CONFIG.maxPallets || 30;
+  const MAX_LOT = 39; // กฎ Firestore: รหัส lot ต้องยาวไม่เกิน 39 ตัวอักษร (ช่องเลขรัน/เลขที่พิมพ์ได้ไม่จำกัด แต่รหัสรวมต้องไม่เกินนี้)
 
   const newRow = () => ({
     id: nextId++, color: '', qty: '', photo: null, cls: null, node: null,
@@ -187,10 +188,10 @@ WMS.pages.receive = (function (W) {
             <select id="lot-m" class="in">${L.months.map((m, i) => `<option value="${W.h(m)}" ${i === m0 ? 'selected' : ''}>${W.h(m)} (${L.monthNames[i]})</option>`).join('')}</select></label>
           <label class="field" id="lot-t-wrap">ประเภท <small>(ตามล็อก)</small>
             <select id="lot-t" class="in" disabled><option value="">เลือกล็อกก่อน</option>${L.types.map((t) => `<option value="${t.v}">${W.h(t.label)}</option>`).join('')}</select></label>
-          <label class="field" id="lot-r-wrap">เลขรัน (${L.runDigits} หลัก)
-            <input id="lot-r" class="in" inputmode="numeric" maxlength="${L.runDigits}" autocomplete="off" placeholder="${'0'.repeat(L.runDigits - 1)}1"></label>
-          <label class="field" id="lot-n-wrap" hidden>เลขที่ (พิมพ์เอง)
-            <input id="lot-n" class="in" inputmode="numeric" maxlength="${L.manualDigits}" autocomplete="off" placeholder="เช่น 4821"></label>
+          <label class="field" id="lot-r-wrap">เลขรัน <small>(ตัวเลข/ตัวอักษร ไม่จำกัด)</small>
+            <input id="lot-r" class="in" inputmode="text" autocapitalize="characters" autocorrect="off" spellcheck="false" autocomplete="off" placeholder="${'0'.repeat(L.runDigits - 1)}1 หรือ A1"></label>
+          <label class="field" id="lot-n-wrap" hidden>เลขที่ <small>(พิมพ์เอง ตัวเลข/ตัวอักษร ไม่จำกัด)</small>
+            <input id="lot-n" class="in" inputmode="text" autocapitalize="characters" autocorrect="off" spellcheck="false" autocomplete="off" placeholder="เช่น 4821 หรือ A12"></label>
         </div>
         <div class="lot-preview" id="lot-preview" aria-live="polite"></div>
         <label class="field" style="margin-top:12px">D/O <small>(ถ้ามี)</small><input id="do" class="in" autocapitalize="characters" autocomplete="off" placeholder="เช่น DO-5503"></label>
@@ -201,10 +202,10 @@ WMS.pages.receive = (function (W) {
       <p id="need" class="need" aria-live="polite"></p>
       <button type="button" id="save" class="btn primary block big">บันทึกรับเข้า</button>`;
     const run = el.querySelector('#lot-r');
-    run.addEventListener('input', () => { run.value = run.value.replace(/\D/g, ''); updateLotPreview(); });
-    run.addEventListener('blur', () => { if (run.value) run.value = run.value.padStart(L.runDigits, '0'); updateLotPreview(); });
+    run.addEventListener('input', () => { run.value = run.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); updateLotPreview(); });
+    run.addEventListener('blur', () => { run.value = padRun(run.value); updateLotPreview(); });
     const num = el.querySelector('#lot-n');
-    num.addEventListener('input', () => { num.value = num.value.replace(/\D/g, ''); updateLotPreview(); });
+    num.addEventListener('input', () => { num.value = num.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); updateLotPreview(); });
     el.querySelector('#lot-p').addEventListener('change', syncLot);
     el.querySelector('#lot-m').addEventListener('change', updateLotPreview);
     syncLot();
@@ -216,6 +217,8 @@ WMS.pages.receive = (function (W) {
 
   // ประกอบรหัส lot → null ถ้ากรอกไม่ครบ   B: B-9SR01 · L: L-3LD12 · 3G: 3G-4821
   const val = (s) => el.querySelector(s).value;
+  // เลขรัน: ตัวเลขล้วนเติม 0 ข้างหน้าให้ครบหลัก (1 → 01) ถ้ามีตัวอักษรใช้ตามที่พิมพ์ (A1, 1A)
+  const padRun = (v) => (/^\d+$/.test(v) ? v.padStart(WMS_CONFIG.lot.runDigits, '0') : v);
   const lotPrefix = () => WMS_CONFIG.lot.prefixes.find((x) => x.v === val('#lot-p'));
   function buildLot() {
     const P = lotPrefix();
@@ -223,7 +226,7 @@ WMS.pages.receive = (function (W) {
     if (P.manual) { const n = val('#lot-n'); return n ? `${P.v}-${n}` : null; }
     const run = val('#lot-r');
     if (!val('#lot-m') || !run) return null;
-    return `${P.v}-${val('#lot-m')}${P.type}${run.padStart(WMS_CONFIG.lot.runDigits, '0')}`;
+    return `${P.v}-${val('#lot-m')}${P.type}${padRun(run)}`;
   }
   // เลือกล็อกแล้วปรับฟอร์ม: 3G → ซ่อนเดือน/ประเภท/เลขรัน แสดงเลขที่ · B/L → ตั้งประเภทตามล็อก (แก้ไม่ได้)
   function syncLot() {
@@ -235,7 +238,9 @@ WMS.pages.receive = (function (W) {
   }
   function updateLotPreview() {
     const code = buildLot(), box = el.querySelector('#lot-preview');
-    box.innerHTML = code ? `รหัส lot: <b>${W.h(code)}</b>` : '<span class="muted">เลือกให้ครบทุกช่องเพื่อสร้างรหัส lot</span>';
+    box.innerHTML = code
+      ? `รหัส lot: <b>${W.h(code)}</b>` + (code.length > MAX_LOT ? `<p class="warn">รหัสยาว ${code.length} ตัวอักษร เกินที่ระบบเก็บได้ (สูงสุด ${MAX_LOT}) — ตัดให้สั้นลง</p>` : '')
+      : '<span class="muted">เลือกให้ครบทุกช่องเพื่อสร้างรหัส lot</span>';
   }
 
   function updateColorList() {
@@ -256,6 +261,7 @@ WMS.pages.receive = (function (W) {
       if (miss) el.querySelector(miss[0]).focus();
       return;
     }
+    if (lot.length > MAX_LOT) { W.toast(`รหัส lot ยาวเกินไป (${lot.length} ตัวอักษร สูงสุด ${MAX_LOT})`, 'error'); return; }
     assignLocs();
     const entries = [], seen = new Set();
     for (let i = 0; i < rows.length; i++) {
