@@ -1,4 +1,5 @@
 // ABC Analysis: จัด class ให้ "สี" จากยอดจ่ายออกย้อนหลัง แล้วแนะนำช่องว่างตาม class
+//   ยอดจ่ายออก = จำนวนพาเรทที่จ่าย (1 รายการจ่ายออก = 1 พาเรท) ไม่ใช้จำนวนม้วน
 //   A = ขายเร็ว → ช่องใกล้ประตู (Zone A) | B = กลาง | C = ช้า/สีใหม่ที่มีประวัติแล้วแต่ยังไม่เคยจ่าย
 window.WMS = window.WMS || {};
 (function (W) {
@@ -19,7 +20,7 @@ window.WMS = window.WMS || {};
     const outs = [...pending.values()].filter((t) => t.ts >= since);
     const qtyBy = {};
     let total = 0;
-    outs.forEach((t) => { const q = Number(t.qty) || 0; qtyBy[key(t.color)] = (qtyBy[key(t.color)] || 0) + q; total += q; });
+    outs.forEach((t) => { qtyBy[key(t.color)] = (qtyBy[key(t.color)] || 0) + 1; total += 1; });
     const cls = {};
     let cum = 0;
     Object.entries(qtyBy).sort((a, b) => b[1] - a[1]).forEach(([k, q]) => {

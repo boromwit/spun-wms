@@ -21,7 +21,7 @@ WMS.pages.search = (function (W) {
     return `<button class="tag ${picked ? 'picked' : 'pending'}" data-id="${W.h(s.id)}"
         aria-label="${W.h(s.loc)} ${picked ? 'หยิบแล้ว' : 'ยังไม่หยิบ'}">
       <span class="tag-loc">${W.h(s.loc)}</span>
-      <span class="tag-sub">${W.h(s.color)} · ${W.fmtQty(s.qty)}</span>
+      <span class="tag-sub">${W.h(s.color)} · ${W.palletLabel(s) || W.fmtQty(s.qty)}</span>
       <span class="tag-state">${picked ? W.icon.check + ' หยิบแล้ว' : 'ยังไม่หยิบ'}</span>
     </button>`;
   }
@@ -29,16 +29,15 @@ WMS.pages.search = (function (W) {
   function cardHtml(lot, items) {
     const dos = [...new Set(items.map((s) => s.doNo).filter(Boolean))];
     const stored = items.filter((s) => s.status === 'stored');
-    const sum = stored.reduce((a, s) => a + Number(s.qty || 0), 0);
     const pickedN = items.length - stored.length;
     items = items.slice().sort((a, b) => (a.status === 'picked') - (b.status === 'picked') || a.loc.localeCompare(b.loc));
     return `<article class="card lot-card">
       <div class="lot-head">
         <div><div class="lot-code">${W.h(lot)}</div>
           <div class="lot-do">${dos.length ? dos.map((d) => `<span class="chip">D/O ${W.h(d)}</span>`).join('') : '<span class="muted">ไม่มี D/O</span>'}</div></div>
-        <div class="lot-sum"><b>${W.fmtQty(sum)}</b><span>${W.unit} คงเหลือ</span></div>
+        <div class="lot-sum"><b>${stored.length}</b><span>พาเรท คงเหลือ</span></div>
       </div>
-      <div class="lot-progress">หยิบแล้ว ${pickedN}/${items.length} ตำแหน่ง</div>
+      <div class="lot-progress">หยิบแล้ว ${pickedN}/${items.length} พาเรท</div>
       <div class="tags">${items.map(tagHtml).join('')}</div>
     </article>`;
   }
@@ -60,10 +59,12 @@ WMS.pages.search = (function (W) {
   function onTag(id) {
     const s = W.db.state.stock.find((x) => x.id === id);
     if (!s) return;
-    const photo = s.photo ? `<img class="photo" src="${W.h(s.photo)}" alt="รูปม้วนผ้า">` : '';
+    const ph = W.photoOf(s);
+    const photo = ph ? `<img class="photo" src="${W.h(ph)}" alt="รูปม้วนผ้า">` : '';
     const info = W.kv([
       ['Lot', W.h(s.lot)], s.doNo ? ['D/O', W.h(s.doNo)] : null,
-      ['สี', W.h(s.color)], ['จำนวน', `${W.fmtQty(s.qty)} ${W.unit}`],
+      ['สี', W.h(s.color)], s.pallets > 1 ? ['พาเรท', `${s.pallet} จาก ${s.pallets}`] : null,
+      ['จำนวน', `${W.fmtQty(s.qty)} ${W.unit}${s.pallets > 1 ? ' (รวมทุกพาเรทของสีนี้)' : ''}`],
       ['ตำแหน่ง', `<b>${W.h(s.loc)}</b><br><small class="muted">${W.h(W.locLabel(s.loc))}</small>`]
     ]) + photo;
     if (s.status === 'stored') {

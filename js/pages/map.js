@@ -13,7 +13,7 @@ WMS.pages.map = (function (W) {
   function cell(state, l) {
     const s = state.slots[l.code];
     return s
-      ? `<button class="cell full" data-loc="${l.code}" aria-label="${l.code} เต็ม lot ${W.h(s.lot)}"><span class="lv">ชั้น ${l.level}</span><span class="cl">${W.h(s.lot)}</span><span class="cq">${W.fmtQty(s.qty)}</span></button>`
+      ? `<button class="cell full" data-loc="${l.code}" aria-label="${l.code} เต็ม lot ${W.h(s.lot)}"><span class="lv">ชั้น ${l.level}</span><span class="cl">${W.h(s.lot)}</span><span class="cq">${s.pallets > 1 ? s.pallet + '/' + s.pallets : W.fmtQty(s.qty)}</span></button>`
       : `<button class="cell free" data-loc="${l.code}" aria-label="${l.code} ว่าง"><span class="lv">ชั้น ${l.level}</span><span class="cl">ว่าง</span></button>`;
   }
 
@@ -34,7 +34,7 @@ WMS.pages.map = (function (W) {
     const cz = counts(state, zone), ca = counts(state);
     el.innerHTML = `<div class="zone-tabs" role="tablist">${WMS_CONFIG.zones.map((x) => {
       const c = counts(state, x.id);
-      const letters = x.rows[0].id + '–' + x.rows[x.rows.length - 1].id;
+      const letters = x.rows.length > 1 ? x.rows[0].id + '–' + x.rows[x.rows.length - 1].id : x.rows[0].id;
       return `<button role="tab" aria-selected="${x.id === zone}" class="ztab ${x.id === zone ? 'on' : ''}" data-zone="${x.id}">${W.h(x.name)} <small>${letters}</small><small>ว่าง ${c.free}/${c.total}</small></button>`;
     }).join('')}</div>
       ${rows.join('')}
@@ -55,9 +55,10 @@ WMS.pages.map = (function (W) {
       title: code, sub: W.locLabel(code),
       body: W.kv([
         ['Lot', W.h(s.lot)], st.doNo ? ['D/O', W.h(st.doNo)] : null,
-        ['สี', W.h(s.color)], ['จำนวน', `${W.fmtQty(s.qty)} ${W.unit}`],
+        ['สี', W.h(s.color)], s.pallets > 1 ? ['พาเรท', `${s.pallet} จาก ${s.pallets}`] : null,
+        ['จำนวน', `${W.fmtQty(s.qty)} ${W.unit}${s.pallets > 1 ? ' (รวมทุกพาเรทของสีนี้)' : ''}`],
         st.receivedAt ? ['รับเข้าเมื่อ', W.fmtTime(st.receivedAt)] : null
-      ]) + (st.photo ? `<img class="photo" src="${W.h(st.photo)}" alt="รูปม้วนผ้า">` : ''),
+      ]) + (W.photoOf(st) ? `<img class="photo" src="${W.h(W.photoOf(st))}" alt="รูปม้วนผ้า">` : ''),
       actions: [
         { label: 'ปิด', kind: 'ghost' },
         { label: 'ดูใน “ค้นหา”', kind: 'primary', onClick: () => { W.pendingQuery = s.lot; location.hash = '#/search'; } }

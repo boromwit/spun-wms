@@ -39,6 +39,17 @@ window.WMS = window.WMS || {};
     return l ? `ชั้นวาง ${l.row} · ช่อง ${W.pad2(l.bay)} · ชั้น ${l.level}` : code;
   };
 
+  // พาเรท: 1 พาเรท = 1 ช่อง (เอกสารเก่าที่ไม่มีฟิลด์ pallets = 1 พาเรท)
+  W.palletLabel = (o) => (o && o.pallets > 1 ? `พาเรท ${o.pallet}/${o.pallets}` : '');
+  // รูปถ่ายเก็บไว้ที่พาเรทแรกของแต่ละสี — พาเรทอื่นของสีเดียวกันดึงรูปจากพาเรทแรก
+  W.photoOf = (s) => {
+    if (!s) return '';
+    if (s.photo) return s.photo;
+    if (!s.entryId) return '';
+    const m = W.db.state.stock.find((x) => x.entryId === s.entryId && x.photo);
+    return m ? m.photo : '';
+  };
+
   // ---------- ไอคอน ----------
   const svg = (p) => `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
   W.icon = {

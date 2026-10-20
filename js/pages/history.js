@@ -20,7 +20,7 @@ WMS.pages.history = (function (W) {
           <div class="tx-ic" aria-hidden="true">${t.type === 'in' ? W.icon.arrowIn : W.icon.arrowOut}</div>
           <div class="tx-main">
             <div class="tx-top"><b>${W.h(t.lot)}</b><span class="tx-type">${t.type === 'in' ? 'รับเข้า' : 'จ่ายออก'}${t.undo ? ' (ยกเลิกหยิบ)' : ''}</span></div>
-            <div class="tx-sub">${W.h(t.color)} · ${W.fmtQty(t.qty)} ${W.unit} · <span class="loc">${W.h(t.loc)}</span>${t.by ? ` · <span class="by">${W.h(W.auth.short(t.by))}</span>` : ''}</div>
+            <div class="tx-sub">${W.h(t.color)} · ${t.pallets > 1 ? W.palletLabel(t) + ' · รวม ' : ''}${W.fmtQty(t.qty)} ${W.unit} · <span class="loc">${W.h(t.loc)}</span>${t.by ? ` · <span class="by">${W.h(W.auth.short(t.by))}</span>` : ''}</div>
           </div>
           <time class="tx-time">${W.fmtTime(t.ts)}</time>
         </div>`).join('') || '<p class="empty">ยังไม่มีรายการ</p>'}</div>`;
@@ -29,8 +29,8 @@ WMS.pages.history = (function (W) {
   function exportCsv() {
     const list = filtered(W.db.state);
     const q = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
-    const head = ['เวลา', 'ประเภท', 'Lot', 'D/O', 'สี', 'จำนวน', 'ตำแหน่ง', 'หมายเหตุ', 'ผู้ทำรายการ'];
-    const lines = list.map((t) => [W.fmtIso(t.ts), t.type === 'in' ? 'รับเข้า' : 'จ่ายออก', t.lot, t.doNo || '', t.color, t.qty, t.loc, t.note || '', t.by || ''].map(q).join(','));
+    const head = ['เวลา', 'ประเภท', 'Lot', 'D/O', 'สี', 'จำนวน', 'ตำแหน่ง', 'หมายเหตุ', 'ผู้ทำรายการ', 'พาเรท'];
+    const lines = list.map((t) => [W.fmtIso(t.ts), t.type === 'in' ? 'รับเข้า' : 'จ่ายออก', t.lot, t.doNo || '', t.color, t.qty, t.loc, t.note || '', t.by || '', t.pallets > 1 ? t.pallet + '/' + t.pallets : '1/1'].map(q).join(','));
     // BOM ให้ Excel อ่านภาษาไทยถูก
     const blob = new Blob(['﻿' + [head.map(q).join(','), ...lines].join('\r\n')], { type: 'text/csv;charset=utf-8' });
     const d = new Date(), name = `wms-history-${filter}-${d.getFullYear()}${W.pad2(d.getMonth() + 1)}${W.pad2(d.getDate())}.csv`;
