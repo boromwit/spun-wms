@@ -201,9 +201,13 @@ WMS.pages.receive = (function (W) {
             <select id="lot-f" class="in"><option value="">เลือก</option>${F.forms.map((x) => `<option value="${x.v}">${W.h(x.label)}</option>`).join('')}</select></label>
         </div>
         <div class="lot-preview" id="lot-preview" aria-live="polite"></div>
-        <label class="field" style="margin-top:12px">D/O <small>(ถ้ามี)</small><input id="do" class="in" autocapitalize="characters" autocomplete="off" placeholder="เช่น DO-5503"></label>
+        <div class="grid2" style="margin-top:12px">
+          <label class="field">D/O <small>(ถ้ามี)</small><input id="do" class="in" autocapitalize="characters" autocomplete="off" placeholder="เช่น DO-5503"></label>
+          <label class="field">ลูกค้า <small>(ถ้ามี)</small><input id="cust" class="in" list="customer-list" maxlength="80" autocomplete="off" placeholder="ชื่อลูกค้า"></label>
+        </div>
       </section>
       <datalist id="color-list"></datalist>
+      <datalist id="customer-list"></datalist>
       <div id="rows"></div>
       <button type="button" id="add" class="btn ghost block">${W.icon.plus} เพิ่มสี</button>
       <p id="need" class="need" aria-live="polite"></p>
@@ -257,13 +261,15 @@ WMS.pages.receive = (function (W) {
   function updateColorList() {
     const dl = el.querySelector('#color-list');
     if (!dl) return;
-    const set = [...new Set(state.stock.map((s) => s.color))].sort();
-    dl.innerHTML = set.map((c) => `<option value="${W.h(c)}">`).join('');
+    const opts = (vals) => [...new Set(vals.filter(Boolean))].sort().map((c) => `<option value="${W.h(c)}">`).join('');
+    dl.innerHTML = opts(state.stock.map((s) => s.color));
+    el.querySelector('#customer-list').innerHTML = opts(state.stock.map((s) => s.customer));
   }
 
   async function save() {
     const lot = buildLot();
     const doNo = el.querySelector('#do').value.trim().toUpperCase();
+    const customer = el.querySelector('#cust').value.trim();
     if (!lot) {
       const P = lotPrefix();
       const miss = [['#lot-p', 'ล็อก'], P && P.manual ? ['#lot-n', 'เลขที่ 3G'] : ['#lot-r', 'เลขรัน']]
@@ -287,7 +293,7 @@ WMS.pages.receive = (function (W) {
       const entryId = 'e' + Date.now().toString(36) + i + Math.random().toString(36).slice(2, 6);
       r.slots.forEach((s, k) => {
         seen.add(s.loc);
-        entries.push({ color: r.color.trim(), qty, loc: s.loc, photo: k === 0 ? r.photo : null, entryId, pallet: k + 1, pallets: n, size, ...(form ? { form } : {}) });
+        entries.push({ color: r.color.trim(), qty, loc: s.loc, photo: k === 0 ? r.photo : null, entryId, pallet: k + 1, pallets: n, size, ...(form ? { form } : {}), ...(customer ? { customer } : {}) });
       });
     }
     const btn = el.querySelector('#save');
@@ -295,7 +301,7 @@ WMS.pages.receive = (function (W) {
     try {
       await W.db.receive({ lot, doNo, entries });
       W.sheet({
-        title: 'บันทึกรับเข้าแล้ว', sub: `Lot ${lot}` + (doNo ? ` · D/O ${doNo}` : '') + ` · ${entries.length} พาเรท`,
+        title: 'บันทึกรับเข้าแล้ว', sub: `Lot ${lot}` + (doNo ? ` · D/O ${doNo}` : '') + (customer ? ` · ${customer}` : '') + ` · ${entries.length} พาเรท`,
         body: '<p class="sheet-sub">นำแต่ละพาเรทไปวางที่ตำแหน่งต่อไปนี้</p><div class="put-list">' +
           entries.map((e) => `<div class="put"><span class="put-loc">${e.loc}</span><span>${W.h(e.color)} · ${e.pallets > 1 ? `พาเรท ${e.pallet}/${e.pallets}` : `${W.fmtQty(e.qty)} ${W.unit}`}</span></div>`).join('') + '</div>',
         actions: [{ label: 'เรียบร้อย', kind: 'primary' }]

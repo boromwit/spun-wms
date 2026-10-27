@@ -10,7 +10,7 @@ WMS.pages.search = (function (W) {
     const byLot = {};
     state.stock.forEach((s) => { (byLot[s.lot] = byLot[s.lot] || []).push(s); });
     let lots = Object.keys(byLot);
-    if (q) lots = lots.filter((l) => l.includes(q) || byLot[l].some((s) => (s.doNo || '').includes(q)));
+    if (q) lots = lots.filter((l) => l.includes(q) || byLot[l].some((s) => (s.doNo || '').includes(q) || (s.customer || '').toUpperCase().includes(q)));
     const latest = (l) => Math.max(...byLot[l].map((s) => s.receivedAt || 0));
     lots.sort((a, b) => latest(b) - latest(a));
     return { lots, byLot };
@@ -18,11 +18,13 @@ WMS.pages.search = (function (W) {
 
   function tagHtml(s) {
     const picked = s.status === 'picked';
+    const age = s.receivedAt && (!picked || s.pickedAt)
+      ? `<span class="tag-age">${picked ? 'เก็บอยู่' : 'เก็บมา'} ${W.ageHtml(s.receivedAt, picked ? s.pickedAt : null)}</span>` : '';
     return `<button class="tag ${picked ? 'picked' : 'pending'}" data-id="${W.h(s.id)}"
         aria-label="${W.h(s.loc)} ${picked ? 'หยิบแล้ว' : 'ยังไม่หยิบ'}">
       <span class="tag-loc">${W.h(s.loc)}</span>
       <span class="tag-sub">${W.h(s.color)} · ${W.palletLabel(s) || W.fmtQty(s.qty)}</span>
-      <span class="tag-state">${picked ? W.icon.check + ' หยิบแล้ว' : 'ยังไม่หยิบ'}</span>
+      <span class="tag-state">${picked ? W.icon.check + ' หยิบแล้ว' : 'ยังไม่หยิบ'}</span>${age}
     </button>`;
   }
 
@@ -30,13 +32,17 @@ WMS.pages.search = (function (W) {
     const dos = [...new Set(items.map((s) => s.doNo).filter(Boolean))];
     const stored = items.filter((s) => s.status === 'stored');
     const pickedN = items.length - stored.length;
+    const custNames = [...new Set(items.map((s) => s.customer).filter(Boolean))];
+    const custLine = custNames.length ? `<div class="lot-cust"><small>ลูกค้า</small><b>${custNames.map((c) => W.h(c)).join(' / ')}</b></div>` : '';
+    const oldest = Math.min(...stored.map((s) => s.receivedAt || Infinity));
+    const age = stored.length && isFinite(oldest) ? `<span class="chip">${stored.length > 1 ? 'เก็บมานานสุด' : 'เก็บมา'} ${W.ageHtml(oldest)}</span>` : '';
     const m = items.find((s) => s.size || s.form) || {};
     const tags = [m.size && W.sizeLabel(m.size), m.form && W.formLabel(m.form)].filter(Boolean).map((t) => `<span class="chip">${W.h(t)}</span>`).join('');
     items = items.slice().sort((a, b) => (a.status === 'picked') - (b.status === 'picked') || a.loc.localeCompare(b.loc));
     return `<article class="card lot-card">
       <div class="lot-head">
-        <div><div class="lot-code">${W.h(lot)}</div>
-          <div class="lot-do">${dos.length ? dos.map((d) => `<span class="chip">D/O ${W.h(d)}</span>`).join('') : '<span class="muted">ไม่มี D/O</span>'}${tags}</div></div>
+        <div><div class="lot-code">${W.h(lot)}</div>${custLine}
+          <div class="lot-do">${dos.length ? dos.map((d) => `<span class="chip">D/O ${W.h(d)}</span>`).join('') : '<span class="muted">ไม่มี D/O</span>'}${tags}${age}</div></div>
         <div class="lot-sum"><b>${stored.length}</b><span>พาเรท คงเหลือ</span></div>
       </div>
       <div class="lot-progress">หยิบแล้ว ${pickedN}/${items.length} พาเรท</div>
@@ -52,7 +58,7 @@ WMS.pages.search = (function (W) {
       results.innerHTML = `<h2 class="sec">ล็อตล่าสุด</h2>` +
         (lots.length ? lots.slice(0, 5).map((l) => cardHtml(l, byLot[l])).join('') : '<p class="empty">ยังไม่มีข้อมูล — เริ่มจากบันทึกรับเข้า</p>');
     } else if (!lots.length) {
-      results.innerHTML = `<p class="empty">ไม่พบ “${W.h(query.trim())}”<br><small>ลองค้นด้วยรหัส lot หรือเลข D/O</small></p>`;
+      results.innerHTML = `<p class="empty">ไม่พบ “${W.h(query.trim())}”<br><small>ลองค้นด้วยรหัส lot เลข D/O หรือชื่อลูกค้า</small></p>`;
     } else {
       results.innerHTML = `<h2 class="sec">พบ ${lots.length} lot</h2>` + lots.slice(0, 30).map((l) => cardHtml(l, byLot[l])).join('');
     }
@@ -63,11 +69,15 @@ WMS.pages.search = (function (W) {
     if (!s) return;
     const ph = W.photoOf(s);
     const photo = ph ? `<img class="photo" src="${W.h(ph)}" alt="รูปม้วนผ้า">` : '';
+    const ageRow = s.receivedAt
+      ? (s.status === 'picked' && s.pickedAt ? ['เก็บอยู่นาน (จนถึงหยิบ)', W.ageHtml(s.receivedAt, s.pickedAt)] : ['เก็บมาแล้ว', W.ageHtml(s.receivedAt)])
+      : null;
     const info = W.kv([
-      ['Lot', W.h(s.lot)], s.doNo ? ['D/O', W.h(s.doNo)] : null,
+      ['Lot', W.h(s.lot)], s.doNo ? ['D/O', W.h(s.doNo)] : null, s.customer ? ['ลูกค้า', `<span class="cust-big">${W.h(s.customer)}</span>`] : null,
       ['สี', W.h(s.color)], s.size ? ['ขนาดผ้า', W.h(W.sizeLabel(s.size))] : null, s.form ? ['ผ้าพับ/ผ้าม้วน', W.h(W.formLabel(s.form))] : null, s.pallets > 1 ? ['พาเรท', `${s.pallet} จาก ${s.pallets}`] : null,
       ['จำนวน', `${W.fmtQty(s.qty)} ${W.unit}${s.pallets > 1 ? ' (รวมทุกพาเรทของสีนี้)' : ''}`],
-      ['ตำแหน่ง', `<b>${W.h(s.loc)}</b><br><small class="muted">${W.h(W.locLabel(s.loc))}</small>`]
+      ['ตำแหน่ง', `<b>${W.h(s.loc)}</b><br><small class="muted">${W.h(W.locLabel(s.loc))}</small>`],
+      ageRow
     ]) + photo;
     if (s.status === 'stored') {
       W.sheet({
@@ -95,7 +105,7 @@ WMS.pages.search = (function (W) {
       if (W.pendingQuery != null) { query = W.pendingQuery; W.pendingQuery = null; }
       el.innerHTML = `<div class="searchbox">${W.icon.search}
           <input id="q" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocapitalize="characters"
-            placeholder="ค้นหา D/O หรือรหัส lot" aria-label="ค้นหา D/O หรือรหัส lot"></div>
+            placeholder="ค้นหา D/O, รหัส lot หรือชื่อลูกค้า" aria-label="ค้นหา D/O, รหัส lot หรือชื่อลูกค้า"></div>
         <div id="results"></div>`;
       input = el.querySelector('#q');
       results = el.querySelector('#results');

@@ -4,7 +4,7 @@
 //   stock/{id}  { lot, doNo, color, qty, loc, status:'stored'|'picked', photo?, receivedAt, pickedAt?, entryId?, pallet?, pallets? }
 //   slots/{loc} { stockId, lot, color, qty, entryId?, pallet?, pallets? }   ← 1 ช่อง = 1 doc; มีอยู่ = ช่องเต็ม (ใช้กันบันทึกทับช่องเดียวกัน)
 //   tx/{id}     { type:'in'|'out', stockId, lot, doNo, color, qty, loc, ts, note?, undo?, entryId?, pallet?, pallets? }
-//   เพิ่มเติม (ถ้ามี): size = 'small'|'large' · form = 'fold'|'roll' (เฉพาะล็อก 3G) — ไม่อยู่ในรหัส lot
+//   เพิ่มเติม (ถ้ามี): size = 'small'|'large' · form = 'fold'|'roll' (เฉพาะล็อก 3G) — ไม่อยู่ในรหัส lot · customer = ชื่อลูกค้า (ข้อความ ไม่บังคับ)
 //   1 พาเรท = 1 ช่อง = 1 stock doc  (pallet = ลำดับพาเรท, pallets = จำนวนพาเรททั้งหมดของสีนั้น; qty = จำนวนม้วนทั้งรายการ ไว้ดูอย่างเดียว)
 window.WMS = window.WMS || {};
 (function (W) {
@@ -30,6 +30,7 @@ window.WMS = window.WMS || {};
     if (o.pallets) { r.entryId = o.entryId; r.pallet = o.pallet; r.pallets = o.pallets; }
     if (o.size) r.size = o.size;
     if (o.form) r.form = o.form;
+    if (o.customer) r.customer = o.customer;
     return r;
   };
 

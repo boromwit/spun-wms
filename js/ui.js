@@ -41,6 +41,19 @@ window.WMS = window.WMS || {};
 
   // พาเรท: 1 พาเรท = 1 ช่อง (เอกสารเก่าที่ไม่มีฟิลด์ pallets = 1 พาเรท)
   W.palletLabel = (o) => (o && o.pallets > 1 ? `พาเรท ${o.pallet}/${o.pallets}` : '');
+  // ระยะเวลาที่เก็บ: จากเวลารับเข้า ถึงตอนนี้ (หรือถึงเวลาหยิบ ถ้าส่ง to) → "2 วัน 05:13:22"
+  W.ageClock = (from, to) => {
+    const s = Math.max(0, Math.floor(((to || Date.now()) - from) / 1000));
+    const d = Math.floor(s / 86400), p = W.pad2;
+    return (d ? `${d} วัน ` : '') + `${p(Math.floor(s % 86400 / 3600))}:${p(Math.floor(s % 3600 / 60))}:${p(s % 60)}`;
+  };
+  // ตัวเลขนับขึ้นเองทุกวินาทีทุกที่ที่แสดง (ไม่ต้องรีเฟรช); ถ้าส่ง to = ช่วงที่จบแล้ว (เช่น เก็บจนถึงตอนหยิบ) จะไม่นับต่อ
+  W.ageHtml = (from, to) => `<span class="age"${to ? '' : ` data-from="${from}"`}>${W.ageClock(from, to)}</span>`;
+  setInterval(() => {
+    if (document.hidden) return;
+    document.querySelectorAll('.age[data-from]').forEach((e) => { e.textContent = W.ageClock(+e.dataset.from); });
+  }, 1000);
+
   // ป้ายชื่อขนาด/ชนิดผ้า (รหัสที่เก็บในข้อมูล → ข้อความไทย; ไม่มีค่า = ข้อความว่าง)
   const fabLabel = (list, v) => { const x = (list || []).find((o) => o.v === v); return x ? x.label : ''; };
   W.sizeLabel = (v) => fabLabel(WMS_CONFIG.fabric.sizes, v);
