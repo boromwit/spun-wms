@@ -45,7 +45,8 @@ WMS.pages.search = (function (W) {
           <div class="lot-do">${dos.length ? dos.map((d) => `<span class="chip">D/O ${W.h(d)}</span>`).join('') : '<span class="muted">ไม่มี D/O</span>'}${tags}${age}</div></div>
         <div class="lot-sum"><b>${stored.length}</b><span>พาเรท คงเหลือ</span></div>
       </div>
-      <div class="lot-progress">หยิบแล้ว ${pickedN}/${items.length} พาเรท</div>
+      <div class="lot-progress">หยิบแล้ว ${pickedN}/${items.length} พาเรท
+        ${pickedN ? `<button class="btn danger sm" data-clear="${W.h(lot)}">ลบที่หยิบแล้ว (${pickedN})</button>` : ''}</div>
       <div class="tags">${items.map(tagHtml).join('')}</div>
     </article>`;
   }
@@ -92,10 +93,23 @@ WMS.pages.search = (function (W) {
         title: 'หยิบแล้ว', sub: s.pickedAt ? 'เมื่อ ' + W.fmtTime(s.pickedAt) : '', body: info,
         actions: [
           { label: 'ปิด', kind: 'ghost' },
+          { label: 'ลบรายการนี้', kind: 'danger', onClick: () => { confirmRemove([id], s.loc); } },
           { label: 'ยกเลิกการหยิบ', kind: 'danger', onClick: async () => { await W.db.undoPick(id); W.toast('ยกเลิกแล้ว — ' + s.loc + ' กลับเป็นยังไม่หยิบ', 'ok'); } }
         ]
       });
     }
+  }
+
+  // ลบรายการที่หยิบแล้วออกจากหน้าค้นหา (ประวัติในหน้า "ประวัติ" ยังอยู่)
+  function confirmRemove(ids, label) {
+    W.sheet({
+      title: 'ลบรายการที่หยิบแล้ว?',
+      body: `<p class="sheet-sub">จะลบ ${W.h(label)} ออกจากหน้าค้นหา — ลบแล้วยกเลิกการหยิบไม่ได้ (ประวัติรับเข้า/จ่ายออกยังอยู่)</p>`,
+      actions: [
+        { label: 'ยกเลิก', kind: 'ghost' },
+        { label: 'ลบ', kind: 'danger', onClick: async () => { await W.db.removePicked(ids); W.toast('ลบแล้ว ' + ids.length + ' รายการ', 'ok'); } }
+      ]
+    });
   }
 
   return {
@@ -113,6 +127,13 @@ WMS.pages.search = (function (W) {
       let t;
       input.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { query = input.value; render(W.db.state); }, 150); });
       results.addEventListener('click', (e) => {
+        const c = e.target.closest('[data-clear]');
+        if (c) {
+          const lot = c.dataset.clear;
+          const ids = W.db.state.stock.filter((x) => x.lot === lot && x.status === 'picked').map((x) => x.id);
+          if (ids.length) confirmRemove(ids, 'ที่หยิบแล้วของ ' + lot + ' (' + ids.length + ' พาเรท)');
+          return;
+        }
         const b = e.target.closest('.tag');
         if (b) onTag(b.dataset.id);
       });

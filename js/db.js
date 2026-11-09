@@ -41,7 +41,7 @@ window.WMS = window.WMS || {};
       authState.ready = true; setTimeout(authEmit, 0);
       const boom = () => { throw state.error; };
       W.auth = mkAuth(boom, boom);
-      return { receive: boom, pick: boom, undoPick: boom };
+      return { receive: boom, pick: boom, undoPick: boom, removePicked: boom };
     }
     firebase.initializeApp(C.firebase);
     const fs = firebase.firestore();
@@ -105,6 +105,14 @@ window.WMS = window.WMS || {};
           t.update(sRef, { status: 'picked', pickedAt: now, pickedBy: by });
           t.delete(col('slots').doc(d.loc));
           t.set(col('tx').doc(), { type: 'out', stockId: id, lot: d.lot, doNo: d.doNo || '', color: d.color, qty: d.qty, loc: d.loc, ts: now, by, ...xinfo(d) });
+        });
+      },
+      // ลบรายการที่หยิบแล้วออกจากหน้าค้นหา (ประวัติใน tx ยังอยู่) — ลบเฉพาะ status = picked
+      async removePicked(ids) {
+        await fs.runTransaction(async (t) => {
+          const refs = ids.map((id) => col('stock').doc(id));
+          const snaps = await Promise.all(refs.map((r) => t.get(r)));
+          snaps.forEach((s, i) => { if (s.exists && s.data().status === 'picked') t.delete(refs[i]); });
         });
       },
       async undoPick(id) {
@@ -219,6 +227,11 @@ window.WMS = window.WMS || {};
         db.tx.push({ id: uid(), type: 'out', stockId: id, lot: s.lot, doNo: s.doNo || '', color: s.color, qty: s.qty, loc: s.loc, ts: now, by: who(), ...xinfo(s) });
         save(); publish();
       },
+      async removePicked(ids) {
+        await wait();
+        db.stock = db.stock.filter((x) => !(ids.includes(x.id) && x.status === 'picked'));
+        save(); publish();
+      },
       async undoPick(id) {
         await wait();
         const s = db.stock.find((x) => x.id === id);
@@ -238,6 +251,7 @@ window.WMS = window.WMS || {};
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     receive: (p) => backend.receive(p),
     pick: (id) => backend.pick(id),
-    undoPick: (id) => backend.undoPick(id)
+    undoPick: (id) => backend.undoPick(id),
+    removePicked: (ids) => backend.removePicked(ids)
   };
 })(window.WMS);

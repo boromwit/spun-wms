@@ -13,7 +13,8 @@ service cloud.firestore {
                     && request.resource.data.qty is number && request.resource.data.qty > 0
                     && (!('photo' in request.resource.data) || request.resource.data.photo.size() < 400000);
       allow update: if signedIn() && request.resource.data.status in ['stored', 'picked'];
-      allow delete: if false;
+      // ลบได้เฉพาะรายการที่หยิบแล้ว (ประวัติใน tx ยังอยู่)
+      allow delete: if signedIn() && resource.data.status == 'picked';
     }
 
     match /slots/{loc} {
