@@ -320,3 +320,4 @@ select.in:disabled { opacity: .75; }
 .cust-big { font-size: 18px; font-weight: 700; color: var(--accent); }
 .age { font-variant-numeric: tabular-nums; }
 .tag-age { font-size: 12px; opacity: .9; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.lot-progress { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
